@@ -79,7 +79,18 @@
       "Bash(xargs cat:*)",
       "Bash(gh auth:*)",
       "Bash(git --version)",
-      "Bash(curl --version)"
+      "Bash(curl --version)",
+      "Bash(where gh:*)",
+      "Bash(powershell -Command \"Get-Command gh\")",
+      "Bash(powershell -Command \"& 'C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe' auth status\")",
+      "Bash(powershell -Command \"& 'C:\\\\Users\\\\AstriNET ENTERPRISE\\\\AppData\\\\Local\\\\GitHubDesktop\\\\bin\\\\gh.exe' auth status\")",
+      "Bash(powershell -Command \"Get-ChildItem -Path 'C:\\\\Program Files\\\\GitHub CLI\\\\' -ErrorAction SilentlyContinue; Get-ChildItem -Path 'C:\\\\Users\\\\AstriNET ENTERPRISE\\\\AppData\\\\Local\\\\Programs\\\\GitHub CLI\\\\' -ErrorAction SilentlyContinue\")",
+      "Bash(cmd /c \"\\\\\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\\\\\" auth status 2>&1\")",
+      "Bash(cmd /c \"\\\\\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\\\\\" auth status\")",
+      "Bash(cmd /c \"\\\\\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\\\\\" auth status && echo AUTH_OK || echo AUTH_FAIL\")",
+      "Bash(cmd /c \"\\\\\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\\\\\" api user\")",
+      "Bash(cmd /c \"\\\\\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\\\\\" api user > C:\\\\Users\\\\Public\\\\gh_test.txt 2>&1\")",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" api user)"
     ]
   }
 }
