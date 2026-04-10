@@ -96,7 +96,8 @@
       "Bash('/c/Program Files/GitHub CLI/gh.exe' pr create --base master --head feature/zapier-vibrate-dark-events --title 'feat: Zapier webhook, vibrate mode sync, dark Events theme, Railway deploy' --body ':*)",
       "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" pr merge 1 --merge --yes)",
       "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" pr merge 1 --merge --subject \"feat: Zapier webhook, vibrate mode sync, dark Events theme, Railway deploy\")",
-      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" pr view 1 --json state,mergedAt,mergeCommit --jq '{state,mergedAt,sha:.mergeCommit.oid}')"
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" pr view 1 --json state,mergedAt,mergeCommit --jq '{state,mergedAt,sha:.mergeCommit.oid}')",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" pr list)"
     ]
   }
 }
