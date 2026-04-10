@@ -402,6 +402,21 @@ app.get('/api/fundamentals', async (_req, res) => {
   }
 });
 
+// ── Privacy policy (served for Google Play Store) ─────────────────────────────
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+app.get('/privacy-policy', (_req, res) => {
+  try {
+    const dir = typeof __dirname !== 'undefined' ? __dirname : dirname(fileURLToPath(import.meta.url));
+    const html = readFileSync(join(dir, 'privacy-policy.html'), 'utf-8');
+    res.type('html').send(html);
+  } catch {
+    res.status(404).send('Privacy policy not found');
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n🟢  Fundamentals server running on http://localhost:${PORT}`);
   if (!REFRESH_TOKEN) {

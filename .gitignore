@@ -8,6 +8,10 @@ coverage/
 !.env.example
 !railway.json
 
+# Release signing key (NEVER commit this)
+release-key.jks
+*.keystore
+
 # Capacitor / Android Studio
 android/
 ios/

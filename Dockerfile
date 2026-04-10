@@ -7,6 +7,7 @@ RUN npm ci --ignore-scripts
 
 COPY server.ts ./
 COPY tsconfig.json ./
+COPY privacy-policy.html ./
 
 EXPOSE 3001
 
