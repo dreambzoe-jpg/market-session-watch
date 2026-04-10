@@ -76,7 +76,10 @@
       "Bash(powershell -Command \"& ''C:\\\\Users\\\\AstriNET ENTERPRISE\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe'' install -r ''E:\\\\BZOE Creativies\\\\MarketSession Watch\\\\android\\\\app\\\\build\\\\intermediates\\\\apk\\\\debug\\\\app-debug.apk''\")",
       "Bash(powershell -Command \"& ''C:\\\\Users\\\\AstriNET ENTERPRISE\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe'' install -r -t ''E:\\\\BZOE Creativies\\\\MarketSession Watch\\\\android\\\\app\\\\build\\\\intermediates\\\\apk\\\\debug\\\\app-debug.apk''\")",
       "Bash(powershell -Command \"& ''C:\\\\Users\\\\AstriNET ENTERPRISE\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe'' reverse tcp:3001 tcp:3001; & ''C:\\\\Users\\\\AstriNET ENTERPRISE\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe'' shell am start -n com.bzoe.marketsessionwatch/.MainActivity\")",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(gh auth:*)",
+      "Bash(git --version)",
+      "Bash(curl --version)"
     ]
   }
 }
