@@ -5,14 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
+    "build:client": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "cap:add": "cap add android",
     "cap:sync": "cap sync",
     "cap:open": "cap open android",
-    "cap:build": "npm run build && cap sync",
+    "cap:build": "npm run build:client && cap sync",
     "server": "tsx server.ts"
   },
   "dependencies": {
