@@ -1,0 +1,5 @@
+{
+  "name": "Market Session Watch",
+  "description": "Real-time trading session monitor for Asian, London, and New York markets with DST support. Runs natively on Android via Capacitor.",
+  "requestFramePermissions": []
+}
