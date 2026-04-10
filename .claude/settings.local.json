@@ -90,7 +90,13 @@
       "Bash(cmd /c \"\\\\\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\\\\\" auth status && echo AUTH_OK || echo AUTH_FAIL\")",
       "Bash(cmd /c \"\\\\\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\\\\\" api user\")",
       "Bash(cmd /c \"\\\\\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\\\\\" api user > C:\\\\Users\\\\Public\\\\gh_test.txt 2>&1\")",
-      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" api user)"
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" api user)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" api user --jq '.login')",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" repo create market-session-watch --public --source=. --remote=origin --push)",
+      "Bash('/c/Program Files/GitHub CLI/gh.exe' pr create --base master --head feature/zapier-vibrate-dark-events --title 'feat: Zapier webhook, vibrate mode sync, dark Events theme, Railway deploy' --body ':*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" pr merge 1 --merge --yes)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" pr merge 1 --merge --subject \"feat: Zapier webhook, vibrate mode sync, dark Events theme, Railway deploy\")",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" pr view 1 --json state,mergedAt,mergeCommit --jq '{state,mergedAt,sha:.mergeCommit.oid}')"
     ]
   }
 }
