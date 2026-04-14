@@ -175,7 +175,7 @@ function FeaturePanel({
   batteryOptOff, setBatteryOptOff, canExactAlarm, setCanExactAlarm,
   requestPermission, sendNotification, sendReminderNotification, playAlertSound, playReminderSound,
   fundamentals, fundamentalsLoading, fundamentalsError,
-  onRefreshFundamentals, onTriggerZapier, zapierTriggered, ringerMode,
+  onRefreshFundamentals, onTriggerMake, makeTriggered, ringerMode,
 }: {
   open: boolean; onClose: () => void; isNative: boolean; isDark: boolean;
   alertsEnabled: boolean; setAlertsEnabled: (v: boolean) => void;
@@ -197,8 +197,8 @@ function FeaturePanel({
   fundamentalsLoading: boolean;
   fundamentalsError: string | null;
   onRefreshFundamentals: () => void;
-  onTriggerZapier: () => Promise<void>;
-  zapierTriggered: boolean;
+  onTriggerMake: () => Promise<void>;
+  makeTriggered: boolean;
 }) {
   const [section, setSection] = useState<PanelSection>('home');
   const [expandedSound, setExpandedSound] = useState<'reminder' | 'session' | null>(null);
@@ -656,17 +656,17 @@ function FeaturePanel({
                         <p className="text-[9px] text-white/25 tracking-widest uppercase mt-0.5">Gold market bias · via Grok AI</p>
                       </div>
                       <div className="ml-auto flex items-center gap-2">
-                        {/* Zapier trigger button — fires the Catch Hook Zap then auto-fetches */}
+                        {/* Make.com trigger button — fires the scenario then auto-fetches */}
                         <button
-                          onClick={onTriggerZapier}
-                          disabled={fundamentalsLoading || zapierTriggered}
-                          title={zapierTriggered ? 'Zapier triggered — fetching…' : 'Trigger Zapier Zap'}
+                          onClick={onTriggerMake}
+                          disabled={fundamentalsLoading || makeTriggered}
+                          title={makeTriggered ? 'Make.com triggered — fetching…' : 'Trigger Make.com scenario'}
                           className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all disabled:opacity-50 ${
-                            zapierTriggered
+                            makeTriggered
                               ? 'bg-[#EAB308]/15 border-[#EAB308]/30 text-[#EAB308]'
                               : 'bg-white/[0.05] border-white/[0.07] text-white/35 hover:text-white/70'
                           }`}>
-                          <RefreshCw size={13} className={fundamentalsLoading || zapierTriggered ? 'animate-spin' : ''} />
+                          <RefreshCw size={13} className={fundamentalsLoading || makeTriggered ? 'animate-spin' : ''} />
                         </button>
                         <button onClick={onClose} className="w-8 h-8 rounded-xl bg-white/[0.05] border border-white/[0.07] flex items-center justify-center text-white/35 hover:text-white/70 transition-colors">
                           <X size={14} />
@@ -674,13 +674,13 @@ function FeaturePanel({
                       </div>
                     </div>
 
-                    {/* Zapier trigger status */}
-                    {zapierTriggered && !fundamentalsLoading && (
+                    {/* Make.com trigger status */}
+                    {makeTriggered && !fundamentalsLoading && (
                       <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
                         className="rounded-2xl border border-[#EAB308]/25 bg-[#EAB308]/[0.07] px-4 py-3 flex items-center gap-3">
                         <RefreshCw size={13} className="text-[#EAB308] animate-spin shrink-0" />
                         <div>
-                          <div className="text-[11px] font-bold text-[#EAB308]">Zapier triggered</div>
+                          <div className="text-[11px] font-bold text-[#EAB308]">Make.com triggered</div>
                           <div className="text-[9px] text-white/40 mt-0.5">Fetching latest email — updating in a moment…</div>
                         </div>
                       </motion.div>
@@ -994,7 +994,7 @@ export default function App() {
   const [fundamentals, setFundamentals]               = useState<FundamentalsData | null>(() => getCachedFundamentals());
   const [fundamentalsLoading, setFundamentalsLoading] = useState(false);
   const [fundamentalsError, setFundamentalsError]     = useState<string | null>(null);
-  const [zapierTriggered, setZapierTriggered]         = useState(false);
+  const [makeTriggered, setMakeTriggered]             = useState(false);
 
   // Show onboarding on first launch
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
@@ -1327,25 +1327,25 @@ export default function App() {
     }
   };
 
-  // ─── Zapier manual trigger ───────────────────────────────────────
-  const triggerZapierAndRefresh = async () => {
-    setZapierTriggered(true);
+  // ─── Make.com manual trigger ─────────────────────────────────────
+  const triggerMakeAndRefresh = async () => {
+    setMakeTriggered(true);
     try {
       const res = await fetch(`${API_BASE}/api/fundamentals/trigger`, { method: 'POST' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Trigger failed' })) as { error?: string };
-        toast.error('Zapier trigger failed', { description: err.error });
+        toast.error('Make.com trigger failed', { description: err.error });
         return;
       }
-      toast.success('Zapier triggered', { description: 'Fetching latest email in ~4 seconds…', duration: 4000 });
-      // Give Zapier time to fetch the email and POST it back
+      toast.success('Make.com triggered', { description: 'Fetching latest email in ~4 seconds…', duration: 4000 });
+      // Give Make.com time to fetch the email and POST it back
       setTimeout(() => {
         fetchFundamentals();
-        setZapierTriggered(false);
+        setMakeTriggered(false);
       }, 4500);
     } catch {
       toast.error('Could not reach server', { description: 'Make sure npm run server is running.' });
-      setZapierTriggered(false);
+      setMakeTriggered(false);
     }
   };
 
@@ -1643,8 +1643,8 @@ export default function App() {
         fundamentalsLoading={fundamentalsLoading}
         fundamentalsError={fundamentalsError}
         onRefreshFundamentals={() => fetchFundamentals()}
-        onTriggerZapier={triggerZapierAndRefresh}
-        zapierTriggered={zapierTriggered}
+        onTriggerMake={triggerMakeAndRefresh}
+        makeTriggered={makeTriggered}
         ringerMode={ringerMode}
       />
 

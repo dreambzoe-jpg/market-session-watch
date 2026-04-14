@@ -29,14 +29,15 @@ app.use(express.json());
 app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-zapier-secret');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-zapier-secret, x-make-secret');
   next();
 });
 
 const CLIENT_ID          = process.env.VITE_GOOGLE_CLIENT_ID    ?? '';
 const CLIENT_SECRET      = process.env.GMAIL_CLIENT_SECRET      ?? '';
 const REFRESH_TOKEN      = process.env.GMAIL_REFRESH_TOKEN      ?? '';
-const ZAPIER_CATCH_HOOK  = process.env.ZAPIER_CATCH_HOOK_URL    ?? '';
+const MAKE_WEBHOOK_SECRET = process.env.MAKE_WEBHOOK_SECRET     ?? '';
+const MAKE_SCENARIO_URL   = process.env.MAKE_SCENARIO_URL       ?? '';
 
 const SETUP_REDIRECT_URI = `http://localhost:${PORT}/auth/callback`;
 const GMAIL_SCOPE        = 'https://www.googleapis.com/auth/gmail.readonly';
@@ -199,9 +200,10 @@ function extractSummary(body: string): string {
   return sentences.slice(0, 3).join(' ').trim() || clean.slice(0, 400).trim();
 }
 
-// ── Zapier webhook cache ──────────────────────────────────────────────────────
-// Zapier POSTs parsed email data here; the GET /api/fundamentals endpoint
-// serves this first and only falls back to the direct Gmail path if empty.
+// ── Webhook cache ─────────────────────────────────────────────────────────────
+// Make.com (or Zapier fallback) POSTs parsed email data here; the GET
+// /api/fundamentals endpoint serves this first and only falls back to the
+// direct Gmail path if empty.
 interface FundamentalsPayload {
   emailId:   string;
   subject:   string;
@@ -210,7 +212,7 @@ interface FundamentalsPayload {
   summary:   string;
   fetchedAt: number;
 }
-let zapierCache: FundamentalsPayload | null = null;
+let webhookCache: FundamentalsPayload | null = null;
 
 // ── One-time OAuth setup routes ────────────────────────────────────────────────
 app.get('/auth/setup', (_req, res) => {
@@ -271,37 +273,36 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
-// ── Zapier webhook endpoint ────────────────────────────────────────────────────
-// Zapier Zap setup:
-//   Trigger  → Gmail: New Email Matching Search (from:noreply@x.ai subject:XAUUSD)
-//   Action   → Webhooks by Zapier: POST
-//              URL      : <your server URL>/api/zapier/hook
-//              Headers  : x-zapier-secret → <value of ZAPIER_WEBHOOK_SECRET in .env>
-//              Data     : subject, bodyPlain (or body), date
+// ── Make.com webhook endpoint ──────────────────────────────────────────────────
+// Make.com Scenario setup:
+//   Module 1 → Gmail: Watch Emails
+//              From: noreply@x.ai  |  Subject contains: XAUUSD
+//   Module 2 → HTTP: Make a Request
+//              URL     : <your Railway URL>/api/make/hook
+//              Method  : POST
+//              Headers : x-make-secret → <value of MAKE_WEBHOOK_SECRET in .env>
+//              Body    : { "subject": "{{subject}}", "bodyPlain": "{{text}}",
+//                          "date": "{{date}}", "messageId": "{{id}}" }
 //
 // For local dev, expose with:  npx ngrok http 3001
-// For production, deploy the server and set VITE_API_URL to the public URL.
-app.post('/api/zapier/hook', (req: Request, res: Response) => {
-  const secret = process.env.ZAPIER_WEBHOOK_SECRET;
-  if (secret && req.headers['x-zapier-secret'] !== secret) {
-    res.status(401).json({ error: 'Unauthorized — wrong x-zapier-secret header' });
+function handleWebhookPost(req: Request, res: Response, secretHeader: string, secretEnvValue: string, platform: string) {
+  if (secretEnvValue && req.headers[secretHeader] !== secretEnvValue) {
+    res.status(401).json({ error: `Unauthorized — wrong ${secretHeader} header` });
     return;
   }
 
-  // Zapier sends the email fields as top-level keys.
-  // "bodyPlain" is the plain-text body Zapier extracts automatically from Gmail.
   const body: Record<string, unknown> = req.body ?? {};
-  const emailText   = String(body['bodyPlain'] ?? body['body'] ?? body['Body'] ?? '');
-  const subject     = String(body['subject']   ?? body['Subject'] ?? 'XAUUSD Analysis');
-  const date        = String(body['date']       ?? body['Date']    ?? new Date().toUTCString());
-  const emailId     = String(body['messageId'] ?? body['id']       ?? Date.now().toString());
+  const emailText = String(body['bodyPlain'] ?? body['body'] ?? body['Body'] ?? '');
+  const subject   = String(body['subject']   ?? body['Subject'] ?? 'XAUUSD Analysis');
+  const date      = String(body['date']      ?? body['Date']    ?? new Date().toUTCString());
+  const emailId   = String(body['messageId'] ?? body['id']      ?? Date.now().toString());
 
   if (!emailText) {
-    res.status(400).json({ error: 'No email body received — ensure Zapier sends bodyPlain or body' });
+    res.status(400).json({ error: `No email body received — ensure ${platform} sends bodyPlain or body` });
     return;
   }
 
-  zapierCache = {
+  webhookCache = {
     emailId,
     subject,
     date,
@@ -310,30 +311,43 @@ app.post('/api/zapier/hook', (req: Request, res: Response) => {
     fetchedAt: Date.now(),
   };
 
-  console.log(`\n📬  Zapier webhook received — bias: ${zapierCache.bias} (${subject})`);
-  res.json({ ok: true, bias: zapierCache.bias });
+  console.log(`\n📬  ${platform} webhook received — bias: ${webhookCache.bias} (${subject})`);
+  res.json({ ok: true, bias: webhookCache.bias });
+}
+
+app.post('/api/make/hook', (req: Request, res: Response) => {
+  handleWebhookPost(req, res, 'x-make-secret', MAKE_WEBHOOK_SECRET, 'Make.com');
+});
+
+// Legacy Zapier path kept for backwards compatibility
+app.post('/api/zapier/hook', (req: Request, res: Response) => {
+  handleWebhookPost(req, res, 'x-zapier-secret', process.env.ZAPIER_WEBHOOK_SECRET ?? '', 'Zapier');
 });
 
 // ── Manual trigger endpoint ────────────────────────────────────────────────────
-// The app's refresh button POSTs here. The server fires the Zapier Catch Hook,
-// which runs the Zap (Gmail Find Email → POST back to /api/zapier/hook).
+// The app's refresh button POSTs here. The server fires the Make.com scenario
+// webhook URL, which runs the scenario (Watch Emails → POST back to /api/make/hook).
 // The app polls /api/fundamentals ~4 s later to pick up the fresh data.
+//
+// Note: Make.com free tier runs on a schedule (every 15 min), not on-demand.
+// To enable on-demand triggering, set MAKE_SCENARIO_URL to the scenario's
+// "On-demand" webhook URL from the scenario's settings.
 app.post('/api/fundamentals/trigger', async (_req: Request, res: Response) => {
-  if (!ZAPIER_CATCH_HOOK) {
-    res.status(503).json({ error: 'ZAPIER_CATCH_HOOK_URL not configured in .env' });
+  if (!MAKE_SCENARIO_URL) {
+    res.status(503).json({ error: 'MAKE_SCENARIO_URL not configured in .env' });
     return;
   }
   try {
-    const zapRes = await fetch(ZAPIER_CATCH_HOOK, {
+    const makeRes = await fetch(MAKE_SCENARIO_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source: 'market-session-watch', triggeredAt: new Date().toISOString() }),
     });
-    if (!zapRes.ok) {
-      res.status(502).json({ error: `Zapier returned ${zapRes.status}` });
+    if (!makeRes.ok) {
+      res.status(502).json({ error: `Make.com returned ${makeRes.status}` });
       return;
     }
-    res.json({ triggered: true, message: 'Zapier Zap fired — data will arrive in a few seconds' });
+    res.json({ triggered: true, message: 'Make.com scenario fired — data will arrive in a few seconds' });
   } catch (e) {
     res.status(500).json({ error: String(e) });
   }
@@ -341,9 +355,9 @@ app.post('/api/fundamentals/trigger', async (_req: Request, res: Response) => {
 
 // ── Main API endpoint ──────────────────────────────────────────────────────────
 app.get('/api/fundamentals', async (_req, res) => {
-  // ── Zapier path (preferred) ───────────────────────────────────────────────
-  if (zapierCache) {
-    res.json(zapierCache);
+  // ── Webhook cache path (preferred — populated by Make.com or Zapier) ────────
+  if (webhookCache) {
+    res.json(webhookCache);
     return;
   }
 
