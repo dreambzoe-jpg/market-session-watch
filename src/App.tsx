@@ -974,6 +974,7 @@ export default function App() {
   const isNative                          = Capacitor.isNativePlatform();
 
   const [showPanel, setShowPanel]         = useState(false);
+  const showPanelRef                      = useRef(false);
   const [reminderMode, setReminderMode]   = useState<'off' | 'once' | 'continuous'>('off');
   const reminderIntervalRef               = useRef<ReturnType<typeof setInterval> | null>(null);
   const reminderTimeoutRef                = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1000,6 +1001,9 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     try { return !localStorage.getItem('onboardingDone'); } catch { return false; }
   });
+
+  // Keep ref in sync so back-button listener always sees latest value
+  useEffect(() => { showPanelRef.current = showPanel; }, [showPanel]);
 
   // ─── Status bar + theme ─────────────────────────────────────────
   useEffect(() => {
@@ -1045,13 +1049,13 @@ export default function App() {
   }, [isNative]);
 
   useEffect(() => {
-    if (isNative) return;
     const saved = localStorage.getItem('marketSessionSettings');
     if (saved) {
       try {
         const s = JSON.parse(saved);
         if (s.alertsEnabled !== undefined) setAlertsEnabled(s.alertsEnabled);
-        if (s.reminderMode) setReminderMode(s.reminderMode);
+        // On native, reminderMode is authoritative from the SessionAlarm plugin (loaded below)
+        if (s.reminderMode && !isNative) setReminderMode(s.reminderMode);
         if (s.localTimeZone) setLocalTimeZone(s.localTimeZone);
         if (s.webSessionRingtoneId) setWebSessionRingtoneId(s.webSessionRingtoneId);
         if (s.webReminderRingtoneId) setWebReminderRingtoneId(s.webReminderRingtoneId);
@@ -1060,12 +1064,16 @@ export default function App() {
   }, [isNative]);
 
   useEffect(() => {
-    if (isNative) return;
-    localStorage.setItem('marketSessionSettings', JSON.stringify({ alertsEnabled, reminderMode, localTimeZone, webSessionRingtoneId, webReminderRingtoneId }));
-  }, [alertsEnabled, reminderMode, localTimeZone, webSessionRingtoneId, webReminderRingtoneId, isNative]);
+    // Save on both web and native so settings survive app restarts
+    localStorage.setItem('marketSessionSettings', JSON.stringify({
+      alertsEnabled, reminderMode, localTimeZone,
+      webSessionRingtoneId, webReminderRingtoneId,
+    }));
+  }, [alertsEnabled, reminderMode, localTimeZone, webSessionRingtoneId, webReminderRingtoneId]);
 
   useEffect(() => {
     if (!isNative) return;
+
     CapApp.addListener('appStateChange', (state: { isActive: boolean }) => {
       if (state.isActive) {
         setNow(new Date());
@@ -1073,6 +1081,15 @@ export default function App() {
         SessionAlarm.getRingerMode()
           .then(({ mode }) => setRingerMode(mode as 'normal' | 'silent' | 'vibrate'))
           .catch(() => {});
+      }
+    });
+
+    // Hardware back button: close open panel first, otherwise exit the app
+    CapApp.addListener('backButton', () => {
+      if (showPanelRef.current) {
+        setShowPanel(false);
+      } else {
+        CapApp.exitApp();
       }
     });
 
@@ -1165,6 +1182,21 @@ export default function App() {
     return { durationMin, totalIntervals, currentInterval: Math.max(1, Math.min(nextInterval, totalIntervals)), nextMarkMin, msUntilNextMark, elapsedMin, remainingMin, isLastInterval: nextMarkMin >= durationMin };
   };
 
+  // ─── Notification channel (Android 8+ requires a channel for heads-up popups) ──
+  useEffect(() => {
+    if (!isNative) return;
+    LocalNotifications.createChannel({
+      id:          'bias_updates',
+      name:        'XAUUSD Bias Updates',
+      description: 'Gold fundamental analysis alerts',
+      importance:  5,   // IMPORTANCE_HIGH → shows as heads-up popup like WhatsApp
+      visibility:  1,   // VISIBILITY_PUBLIC
+      sound:       'default',
+      vibration:   true,
+      lights:      true,
+    }).catch(() => {});
+  }, [isNative]);
+
   // ─── Notifications ───────────────────────────────────────────────
   const requestPermission = async (): Promise<'granted' | 'denied' | 'default'> => {
     if (isNative) {
@@ -1199,7 +1231,17 @@ export default function App() {
 
   const sendNotification = async (title: string, body: string) => {
     if (isNative && notifGranted) {
-      await LocalNotifications.schedule({ notifications: [{ title, body, id: notifIdRef.current++, schedule: { at: new Date(Date.now() + 300) } }] }).catch(() => {});
+      await LocalNotifications.schedule({
+        notifications: [{
+          title,
+          body,
+          id:        notifIdRef.current++,
+          channelId: 'bias_updates',          // required for heads-up on Android 8+
+          schedule:  { at: new Date(Date.now() + 300) },
+          smallIcon: 'ic_stat_icon_config_sample',
+          iconColor: '#F27D26',
+        }],
+      }).catch(() => {});
     } else if (!isNative && notifGranted && typeof Notification !== 'undefined') {
       new Notification(title, { body });
     }
@@ -1304,18 +1346,22 @@ export default function App() {
       const data = await res.json() as FundamentalsData;
 
       const lastId = getLastKnownEmailId();
-      if (lastId && lastId !== data.emailId) {
+      const isNewEmail = lastId !== data.emailId;
+      if (isNewEmail) {
+        // New email from Grok — send heads-up notification + toast
         await sendNotification(
           `XAUUSD Bias: ${data.bias.toUpperCase()}`,
-          data.summary.slice(0, 100) + (data.summary.length > 100 ? '…' : ''),
+          data.summary.slice(0, 120) + (data.summary.length > 120 ? '…' : ''),
         );
-        toast.success(`Gold Bias Updated: ${data.bias.toUpperCase()}`, {
-          description: 'New Grok AI fundamental analysis received.',
-          icon: data.bias === 'bullish' ? <TrendingUp size={16} />
-            : data.bias === 'bearish' ? <TrendingDown size={16} />
-            : <Minus size={16} />,
-          duration: 7000,
-        });
+        if (!silent) {
+          toast.success(`Gold Bias Updated: ${data.bias.toUpperCase()}`, {
+            description: 'New Grok AI fundamental analysis received.',
+            icon: data.bias === 'bullish' ? <TrendingUp size={16} />
+              : data.bias === 'bearish' ? <TrendingDown size={16} />
+              : <Minus size={16} />,
+            duration: 7000,
+          });
+        }
       }
       setLastKnownEmailId(data.emailId);
       storeCachedFundamentals(data);
