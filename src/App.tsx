@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef, memo } from 'react';
+import React, { useState, useEffect, useRef, memo, useMemo } from 'react';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 import {
   Bell, BellOff, Timer, Repeat, RotateCcw, X, Zap, Activity,
   BatteryCharging, AlarmClock, Music, CheckCircle2, ChevronDown, ChevronUp,
   AlertCircle, TrendingUp, TrendingDown, Minus, Clock, LayoutGrid, Volume2, Play,
-  ToggleLeft, ToggleRight, ChevronRight, RefreshCw, Mail, Vibrate,
+  ToggleLeft, ToggleRight, ChevronRight, RefreshCw, Mail, Vibrate, Search,
 } from 'lucide-react';
 import {
   getCachedFundamentals, storeCachedFundamentals,
@@ -991,6 +991,27 @@ export default function App() {
   const [isDark, setIsDark]               = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
   const [ringerMode, setRingerMode]       = useState<'normal' | 'silent' | 'vibrate' | null>(null);
 
+  // ─── Timezone picker state ────────────────────────────────────────
+  const [showTzPicker, setShowTzPicker] = useState(false);
+  const [tzSearch, setTzSearch]         = useState('');
+
+  const allTimezones = useMemo(() => {
+    try { return (Intl as any).supportedValuesOf('timeZone') as string[]; }
+    catch { return ['UTC','America/New_York','Europe/London','Asia/Tokyo','Australia/Sydney','Africa/Johannesburg']; }
+  }, []);
+
+  const filteredTimezones = useMemo(() => {
+    const q = tzSearch.toLowerCase().trim();
+    if (!q) return allTimezones;
+    return allTimezones.filter(tz => tz.toLowerCase().includes(q));
+  }, [allTimezones, tzSearch]);
+
+  const tzDisplayName = useMemo(() => {
+    const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (localTimeZone === localTz) return 'Local';
+    return localTimeZone.split('/').pop()?.replace(/_/g, ' ') ?? localTimeZone;
+  }, [localTimeZone]);
+
   // ─── Fundamentals state ───────────────────────────────────────────
   const [fundamentals, setFundamentals]               = useState<FundamentalsData | null>(() => getCachedFundamentals());
   const [fundamentalsLoading, setFundamentalsLoading] = useState(false);
@@ -1441,7 +1462,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* Quick alert toggle */}
+          {/* Master notification toggle — controls session alerts + interval reminders */}
           <button
             onClick={async () => {
               const next = !alertsEnabled;
@@ -1449,8 +1470,16 @@ export default function App() {
                 const perm = await requestPermission();
                 if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
                 else playAlertSound();
-                if (perm === 'granted') toast.success('Alerts Enabled');
-                else if (perm === 'denied') toast.error('Permission Required', { description: 'Enable notifications in settings.' });
+                if (perm === 'granted') {
+                  setReminderMode('continuous');
+                  toast.success('All Notifications On', { description: 'Session alerts + interval reminders enabled.' });
+                } else if (perm === 'denied') {
+                  toast.error('Permission Required', { description: 'Enable notifications in device settings.' });
+                }
+              } else {
+                setReminderMode('off');
+                if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+                toast.info('All Notifications Off', { description: 'Session alerts + reminders disabled.' });
               }
               setAlertsEnabled(next);
             }}
@@ -1642,19 +1671,12 @@ export default function App() {
           <div className="w-px h-3 bg-white/[0.08] hidden sm:block" />
           <div className="flex items-center gap-2">
             <Clock size={9} className="text-[#8B5CF6]/50" />
-            <div className="relative flex items-center">
-              <select value={localTimeZone} onChange={e => setLocalTimeZone(e.target.value)}
-                className="appearance-none bg-transparent text-[7px] font-black uppercase tracking-[0.25em] text-[#8B5CF6]/60 focus:outline-none cursor-pointer pr-3">
-                <option value={Intl.DateTimeFormat().resolvedOptions().timeZone} className="bg-[#111]">Local</option>
-                <option value="Africa/Johannesburg" className="bg-[#111]">Johannesburg</option>
-                <option value="UTC" className="bg-[#111]">UTC</option>
-                <option value="Europe/London" className="bg-[#111]">London</option>
-                <option value="America/New_York" className="bg-[#111]">New York</option>
-                <option value="Asia/Tokyo" className="bg-[#111]">Tokyo</option>
-                <option value="Australia/Sydney" className="bg-[#111]">Sydney</option>
-              </select>
-              <ChevronDown size={7} className="absolute right-0 text-white/20 pointer-events-none" />
-            </div>
+            <button
+              onClick={() => { setTzSearch(''); setShowTzPicker(true); }}
+              className="flex items-center gap-1 text-[7px] font-black uppercase tracking-[0.25em] text-[#8B5CF6]/60 hover:text-[#8B5CF6] transition-colors">
+              {tzDisplayName}
+              <ChevronDown size={7} className="text-white/20" />
+            </button>
             <span className="font-mono text-[11px] font-bold text-white/40 tabular-nums">{formatInTimeZone(now, localTimeZone, 'HH:mm:ss')}</span>
           </div>
         </div>
@@ -1693,6 +1715,92 @@ export default function App() {
         makeTriggered={makeTriggered}
         ringerMode={ringerMode}
       />
+
+      {/* ── Timezone Picker ──────────────────────────────────────── */}
+      <AnimatePresence>
+        {showTzPicker && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowTzPicker(false)}>
+            <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }} transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
+              className="w-full max-w-sm h-[75vh] rounded-t-3xl sm:rounded-2xl border border-white/[0.08] bg-[var(--bg-panel)] shadow-2xl flex flex-col overflow-hidden"
+              onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/[0.05]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#8B5CF6]/10 border border-[#8B5CF6]/20 flex items-center justify-center">
+                    <Clock size={14} className="text-[#8B5CF6]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold">Time Zone</h3>
+                    <p className="text-[9px] text-white/25 mt-0.5">Search any city or region</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowTzPicker(false)}
+                  className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/30 hover:text-white/70 transition-colors">
+                  <X size={13} />
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="px-4 py-3 border-b border-white/[0.05]">
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.07]">
+                  <Search size={12} className="text-white/30 shrink-0" />
+                  <input
+                    autoFocus
+                    value={tzSearch}
+                    onChange={e => setTzSearch(e.target.value)}
+                    placeholder="Search city or timezone…"
+                    className="flex-1 bg-transparent text-[11px] text-white placeholder-white/20 focus:outline-none"
+                  />
+                  {tzSearch && (
+                    <button onClick={() => setTzSearch('')} className="text-white/30 hover:text-white/60 transition-colors">
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Timezone list */}
+              <div className="flex-1 overflow-y-auto py-1">
+                {/* Local shortcut — only shown when not searching */}
+                {!tzSearch && (
+                  <button
+                    onClick={() => { setLocalTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone); setShowTzPicker(false); }}
+                    className={`w-full flex items-center justify-between px-5 py-3 hover:bg-white/[0.04] transition-colors ${localTimeZone === Intl.DateTimeFormat().resolvedOptions().timeZone ? 'text-[#8B5CF6]' : 'text-white/60'}`}>
+                    <div>
+                      <div className="text-[11px] font-bold">Local (device default)</div>
+                      <div className="text-[9px] text-white/30 mt-0.5">{Intl.DateTimeFormat().resolvedOptions().timeZone}</div>
+                    </div>
+                    {localTimeZone === Intl.DateTimeFormat().resolvedOptions().timeZone && <CheckCircle2 size={13} className="text-[#8B5CF6]" />}
+                  </button>
+                )}
+
+                {filteredTimezones.map(tz => (
+                  <button key={tz}
+                    onClick={() => { setLocalTimeZone(tz); setShowTzPicker(false); }}
+                    className={`w-full flex items-center justify-between px-5 py-2.5 hover:bg-white/[0.04] transition-colors ${localTimeZone === tz ? 'text-[#8B5CF6]' : 'text-white/60'}`}>
+                    <div>
+                      <div className="text-[11px] font-semibold">{tz.split('/').pop()?.replace(/_/g, ' ')}</div>
+                      <div className="text-[9px] text-white/25 mt-0.5">{tz}</div>
+                    </div>
+                    {localTimeZone === tz && <CheckCircle2 size={13} className="text-[#8B5CF6]" />}
+                  </button>
+                ))}
+
+                {filteredTimezones.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12 text-white/20">
+                    <Clock size={24} className="mb-3" />
+                    <p className="text-[11px]">No timezones match "{tzSearch}"</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Dev Panel ────────────────────────────────────────────── */}
       <AnimatePresence>
