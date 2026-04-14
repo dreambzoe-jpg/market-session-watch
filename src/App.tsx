@@ -72,6 +72,35 @@ const SESSIONS: Session[] = [
   { id: 'nyse',         group: 'New York', label: 'NYSE',          start: '14:30', end: '15:00', isPeak: true, color: '#F27D26' },
 ];
 
+// ─── Static timezone list (safe for all Android WebView versions) ─────────────
+// Avoids Intl.supportedValuesOf() which is not available on older WebViews.
+const ALL_TIMEZONES: string[] = [
+  'UTC',
+  'Africa/Abidjan','Africa/Accra','Africa/Addis_Ababa','Africa/Algiers','Africa/Cairo',
+  'Africa/Casablanca','Africa/Johannesburg','Africa/Lagos','Africa/Nairobi','Africa/Tunis',
+  'America/Anchorage','America/Argentina/Buenos_Aires','America/Bogota','America/Caracas',
+  'America/Chicago','America/Denver','America/Halifax','America/Lima','America/Los_Angeles',
+  'America/Mexico_City','America/Miami','America/New_York','America/Phoenix','America/Santiago',
+  'America/Sao_Paulo','America/St_Johns','America/Toronto','America/Vancouver',
+  'Asia/Almaty','Asia/Amman','Asia/Baghdad','Asia/Bahrain','Asia/Bangkok','Asia/Beirut',
+  'Asia/Colombo','Asia/Dhaka','Asia/Dubai','Asia/Ho_Chi_Minh','Asia/Hong_Kong',
+  'Asia/Jakarta','Asia/Jerusalem','Asia/Karachi','Asia/Kathmandu','Asia/Kolkata',
+  'Asia/Kuala_Lumpur','Asia/Kuwait','Asia/Manila','Asia/Muscat','Asia/Nicosia',
+  'Asia/Qatar','Asia/Riyadh','Asia/Seoul','Asia/Shanghai','Asia/Singapore',
+  'Asia/Taipei','Asia/Tashkent','Asia/Tehran','Asia/Tokyo','Asia/Yangon',
+  'Atlantic/Azores','Atlantic/Canary','Atlantic/Cape_Verde','Atlantic/Reykjavik',
+  'Australia/Adelaide','Australia/Brisbane','Australia/Darwin','Australia/Hobart',
+  'Australia/Melbourne','Australia/Perth','Australia/Sydney',
+  'Europe/Amsterdam','Europe/Athens','Europe/Belgrade','Europe/Berlin','Europe/Brussels',
+  'Europe/Bucharest','Europe/Budapest','Europe/Copenhagen','Europe/Dublin','Europe/Helsinki',
+  'Europe/Istanbul','Europe/Kiev','Europe/Lisbon','Europe/London','Europe/Luxembourg',
+  'Europe/Madrid','Europe/Moscow','Europe/Oslo','Europe/Paris','Europe/Prague',
+  'Europe/Rome','Europe/Sofia','Europe/Stockholm','Europe/Vienna','Europe/Warsaw',
+  'Europe/Zurich',
+  'Pacific/Auckland','Pacific/Fiji','Pacific/Guam','Pacific/Honolulu','Pacific/Noumea',
+  'Pacific/Port_Moresby','Pacific/Tahiti','Pacific/Tongatapu',
+];
+
 // Web ringtone presets
 const WEB_RINGTONES = [
   { id: 'chime',  name: 'Market Chime',  url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
@@ -995,16 +1024,11 @@ export default function App() {
   const [showTzPicker, setShowTzPicker] = useState(false);
   const [tzSearch, setTzSearch]         = useState('');
 
-  const allTimezones = useMemo(() => {
-    try { return (Intl as any).supportedValuesOf('timeZone') as string[]; }
-    catch { return ['UTC','America/New_York','Europe/London','Asia/Tokyo','Australia/Sydney','Africa/Johannesburg']; }
-  }, []);
-
   const filteredTimezones = useMemo(() => {
     const q = tzSearch.toLowerCase().trim();
-    if (!q) return allTimezones;
-    return allTimezones.filter(tz => tz.toLowerCase().includes(q));
-  }, [allTimezones, tzSearch]);
+    if (!q) return ALL_TIMEZONES;
+    return ALL_TIMEZONES.filter(tz => tz.toLowerCase().replace(/_/g, ' ').includes(q));
+  }, [tzSearch]);
 
   const tzDisplayName = useMemo(() => {
     const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -1756,7 +1780,6 @@ export default function App() {
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.07]">
                   <Search size={12} className="text-white/30 shrink-0" />
                   <input
-                    autoFocus
                     value={tzSearch}
                     onChange={e => setTzSearch(e.target.value)}
                     placeholder="Search city or timezone…"
