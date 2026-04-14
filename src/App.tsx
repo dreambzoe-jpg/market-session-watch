@@ -1688,6 +1688,13 @@ export default function App() {
             {isNative && <span className="italic"> Running natively on Android.</span>}
           </p>
         </div>
+
+        {/* Signature */}
+        <div className="flex justify-end px-1 pt-1">
+          <span className="text-[8px] font-black tracking-[0.2em] uppercase text-white/10 select-none">
+            Bzoefx <span className="text-[#F27D26]/30">v.1</span>
+          </span>
+        </div>
       </div>
 
       {/* ── Feature Panel (slide-up) ─────────────────────────────── */}
